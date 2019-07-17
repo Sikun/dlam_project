@@ -9,11 +9,11 @@ class FileConverter:
             bio = np.chararray(len(text), itemsize=1)
             bio[:] = "O"
             type = np.chararray(len(text), itemsize=2)
-            type[:] = "_"
+            type[:] = "X"
             distance = np.empty(len(text))
             distance[:] = np.nan
             stance = np.chararray(len(text), itemsize=4)
-            stance[:] = "_"
+            stance[:] = "X"
 
         with open(filename+".ann", 'r') as annfile:
             entitiesDict = {}
@@ -70,7 +70,7 @@ class FileConverter:
                 raise ValueError("Stance array is not correct in File: "+filename)
 
             if np.isnan(distance[startIdx]):
-                dist = "_";
+                dist = "X";
             else:
                 dist = str(int(distance[startIdx]))
             output.append({'text': text[startIdx:endIdx], 'b': bio[startIdx], 't': type[startIdx],
@@ -78,13 +78,14 @@ class FileConverter:
 
             if additionalIdx != -1:
                 if np.isnan(distance[additionalIdx]):
-                    dist = "_";
+                    dist = "X";
                 else:
                     dist = int(distance[additionalIdx])
                 output.append({'text': text[additionalIdx], 'b': bio[additionalIdx], 't': type[additionalIdx],
                                 'd': dist, 's': stance[additionalIdx]})
-        for element in output:
-            print(element)
+        # for element in output:
+        #     print(element)
+        return output
 
 fc = FileConverter()
 fc.parse_file("../brat-project-final/essay001")

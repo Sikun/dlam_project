@@ -126,7 +126,7 @@ flags.DEFINE_string("crf", "True", "use crf!")
 class InputExample(object):
   """A single training/test example for simple sequence classification."""
 
-  def __init__(self, guid, text, b=None, t=None, d=None, s=None):
+  def __init__(self, guid, data):
     """Constructs a InputExample.
 
     Args:
@@ -137,11 +137,11 @@ class InputExample(object):
         specified for train and dev examples, but not for test examples.
     """
     self.guid = guid
-    self.text = text
-    self.component = b
-    self.ctype = t
-    self.relation = d
-    self.rtype = s
+    self.data = data
+    # self.component = b
+    # self.ctype = t
+    # self.relation = d
+    # self.rtype = s
 
 class PaddingInputExample(object):
   """Fake example so the num input examples is a multiple of the batch size.
@@ -231,7 +231,7 @@ class NerProcessor(DataProcessor):
         :return:
         """
         # return ["[PAD]","B-MISC", "I-MISC", "O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X","[CLS]","[SEP]"]
-        return {'b': ["O", "B", "I", "_"], 't': ["C", "P", "MC", "_"], 'd': [str(s) for s in range(-11, 11)]+["_"], 's': ["Supp", "Att", "For", "Ag", "_"]}
+        return {'b': ["O", "B", "I", "X"], 't': ["C", "P", "MC", "X"], 'd': [str(s) for s in range(-11, 11)]+["X"], 's': ["Supp", "Att", "For", "Ag", "X"]}
 
     def _create_example(self, data_dir, start_id, end_id, set_type):
         fc = FileConverter()
@@ -239,14 +239,15 @@ class NerProcessor(DataProcessor):
         for i in range(start_id, end_id + 1):
             filename = '{}essay{:03d}'.format(data_dir, i)
             parsed_file = fc.parse_file(filename)
-            for j, text_token in enumerate(parsed_file):
-                guid = "%s-%s-%s" % (set_type, i, j)
-                texts = tokenization.convert_to_unicode(text_token['text'])
-                b = tokenization.convert_to_unicode(text_token['b'])
-                t = tokenization.convert_to_unicode(text_token['t'])
-                d = tokenization.convert_to_unicode(text_token['d'])
-                s = tokenization.convert_to_unicode(text_token['s'])
-                examples.append(InputExample(guid=guid, text=texts, b=b, t=t, d=d, s=s))
+            # for j, text_token in enumerate(parsed_file):
+            #     guid = "%s-%s-%s" % (set_type, i, j)
+            #     texts = tokenization.convert_to_unicode(text_token['text'])
+            #     b = tokenization.convert_to_unicode(text_token['b'])
+            #     t = tokenization.convert_to_unicode(text_token['t'])
+            #     d = tokenization.convert_to_unicode(text_token['d'])
+            #     s = tokenization.convert_to_unicode(text_token['s'])
+            guid = "%s-%s" % (set_type, i)
+            examples.append(InputExample(guid=guid, data=parsed_file))
         # for (i, line) in enumerate(lines):
         #     guid = "%s-%s" % (set_type, i)
         #     texts = tokenization.convert_to_unicode(line[1])
