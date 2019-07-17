@@ -57,17 +57,17 @@ class FileConverter:
                 endIdx = index + len(item) - 1
                 additionalIdx = index + len(item) - 1
 
-            if np.any(bio[startIdx:endIdx] != bio[startIdx]) and (bio[startIdx] != b"B" or np.any(bio[startIdx+1:endIdx] != b"I")):
-                raise ValueError("BIO array is not correct in File: "+filename)
-
-            if np.any(type[startIdx:endIdx] != type[startIdx]):
-                raise ValueError("Type array is not correct in File: "+filename)
-
-            if np.any(distance[startIdx:endIdx] != distance[startIdx]) and not np.all(np.isnan(distance[startIdx:endIdx])):
-                raise ValueError("Distance array is not correct in File: "+filename)
-
-            if np.any(stance[startIdx:endIdx] != stance[startIdx]):
-                raise ValueError("Stance array is not correct in File: "+filename)
+            # if np.any(bio[startIdx:endIdx] != bio[startIdx]) and (bio[startIdx] != b"B" or np.any(bio[startIdx+1:endIdx] != b"I")):
+            #     raise ValueError("BIO array is not correct in File: "+filename)
+            #
+            # if np.any(type[startIdx:endIdx] != type[startIdx]):
+            #     raise ValueError("Type array is not correct in File: "+filename)
+            #
+            # if np.any(distance[startIdx:endIdx] != distance[startIdx]) and not np.all(np.isnan(distance[startIdx:endIdx])):
+            #     raise ValueError("Distance array is not correct in File: "+filename)
+            #
+            # if np.any(stance[startIdx:endIdx] != stance[startIdx]):
+            #     raise ValueError("Stance array is not correct in File: "+filename)
 
             if np.isnan(distance[startIdx]):
                 dist = "X";
@@ -87,5 +87,13 @@ class FileConverter:
         #     print(element)
         return output
 
-#fc = FileConverter()
-#fc.parse_file("../brat-project-final/essay001")
+# fc = FileConverter()
+# data_dir = "../brat-project-final/"
+# start_id = 1
+# end_id = 402
+#
+# for i in range(start_id, end_id + 1):
+#     filename = '{}essay{:03d}'.format(data_dir, i)
+#     parsed_file = fc.parse_file(filename)
+#     for element in parsed_file:
+#         print(element)
