@@ -138,10 +138,10 @@ class InputExample(object):
     """
     self.guid = guid
     self.text = text
-    self.b = b
-    self.t = t
-    self.d = d
-    self.s = s
+    self.component = b
+    self.ctype = t
+    self.relation = d
+    self.rtype = s
 
 class PaddingInputExample(object):
   """Fake example so the num input examples is a multiple of the batch size.
@@ -270,38 +270,83 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     labels: [I-PER,I-PER,X,O,O,O,X]
 
     """
-    label_map = {}
+
+    label_map_component = {}
     #here start with zero this means that "[PAD]" is zero
-    for (i,label) in enumerate(label_list):
-        label_map[label] = i
+    for (i,label) in enumerate(label_list['component']):
+        label_map_component[label] = i
+
+    label_map_ctype = {}
+    #here start with zero this means that "[PAD]" is zero
+    for (i,label) in enumerate(label_list['ctype']):
+        label_map_ctype[label] = i
+
+    label_map_relation = {}
+    #here start with zero this means that "[PAD]" is zero
+    for (i,label) in enumerate(label_list['relation']):
+        label_map_relation[label] = i
+
+    label_map_rtype = {}
+    #here start with zero this means that "[PAD]" is zero
+    for (i,label) in enumerate(label_list['rtype']):
+        label_map_rtype[label] = i
+
+
+
     with open(FLAGS.middle_output+"/label2id.pkl",'wb') as w:
         pickle.dump(label_map,w)
     textlist = example.text.split(' ')
-    labellist = example.label.split(' ')
+    labellist = {}
+
+    labellist['component'] = example.component.split(' ')
+    labellist['ctype'] = example.ctype.split(' ')
+    labellist['relation'] = example.relation.split(' ')
+    labellist['rtype'] = example.rtype.split(' ')
+
     tokens = []
-    labels = []
-    for i,(word,label) in enumerate(zip(textlist,labellist)):
+
+    labels_component = []
+    labels_ctype = []
+    labels_relation = []
+    labels_rtype = []
+
+    for i,(word,component, ctype, relation, rtype) in enumerate(zip(textlist, labellist{'component'}, labellist{'ctype'}, labellist{'relation'}, labellist{'rtype'})):
         token = tokenizer.tokenize(word)
         tokens.extend(token)
         for i,_ in enumerate(token):
             if i==0:
-                labels.append(label)
+                labels_component.append(component)
+                labels_ctype.append(ctype)
+                labels_relation.append(relation)
+                labels_rtype.append(rtype)
             else:
-                labels.append("X")
+                labels_component.append("X")
+                labels_ctype.append("X")
+                labels_relation.append("X")
+                labels_rtype.append("X")
+
     # only Account for [CLS] with "- 1".
     if len(tokens) >= max_seq_length - 1:
+        print("max_seq_length exceeded by ", len(tokens) - max_seq_length + 1, " seq_length: ", len(tokens), " max_seq_length: ", max_seq_length - 1)
         tokens = tokens[0:(max_seq_length - 1)]
         labels = labels[0:(max_seq_length - 1)]
+
     ntokens = []
     segment_ids = []
-    label_ids = []
+    label_ids = {'component': [], 'ctype': [], 'relation': [], 'rtype': []}
     ntokens.append("[CLS]")
     segment_ids.append(0)
-    label_ids.append(label_map["[CLS]"])
+
+    for s in ['component', 'ctype', 'relation', 'rtype']:
+        label_ids[s].append(label_map["[CLS]"])
+
     for i, token in enumerate(tokens):
         ntokens.append(token)
         segment_ids.append(0)
-        label_ids.append(label_map[labels[i]])
+        label_ids['component'].append(label_map[labels_component[i]])
+        label_ids['ctype'].append(label_map[labels_ctype[i]])
+        label_ids['relation'].append(label_map[labels_relation[i]])
+        label_ids['rtype'].append(label_map[labels_rtype[i]])
     # after that we don't add "[SEP]" because we want a sentence don't have
     # stop tag, because i think its not very necessary.
     # or if add "[SEP]" the model even will cause problem, special the crf layer was used.
@@ -312,12 +357,14 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
         input_ids.append(0)
         mask.append(0)
         segment_ids.append(0)
-        label_ids.append(0)
+        for s in ['component', 'ctype', 'relation', 'rtype']:
+            label_ids[s].append(0)
         ntokens.append("[PAD]")
     assert len(input_ids) == max_seq_length
     assert len(mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
-    assert len(label_ids) == max_seq_length
+    for s in ['component', 'ctype', 'relation', 'rtype']:
+        assert len(label_ids[s]) == max_seq_length
     assert len(ntokens) == max_seq_length
     if ex_index < 3:
         logging.info("*** Example ***")
@@ -327,7 +374,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
         logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
         logging.info("input_mask: %s" % " ".join([str(x) for x in mask]))
         logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
+        #logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
     feature = InputFeatures(
         input_ids=input_ids,
         mask=mask,
@@ -355,7 +402,8 @@ def filed_based_convert_examples_to_features(examples, label_list, max_seq_lengt
         features["input_ids"] = create_int_feature(feature.input_ids)
         features["mask"] = create_int_feature(feature.mask)
         features["segment_ids"] = create_int_feature(feature.segment_ids)
-        features["label_ids"] = create_int_feature(feature.label_ids)
+        for s in ['component', 'ctype', 'relation', 'rtype']:
+            features["label_ids_" + s] = create_int_feature(feature.label_ids[s])
         tf_example = tf.train.Example(features=tf.train.Features(feature=features))
         writer.write(tf_example.SerializeToString())
     # sentence token in each batch
@@ -367,8 +415,10 @@ def file_based_input_fn_builder(input_file, seq_length, is_training, drop_remain
         "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
         "mask": tf.FixedLenFeature([seq_length], tf.int64),
         "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
-        "label_ids": tf.FixedLenFeature([seq_length], tf.int64),
-
+        "label_ids_component": tf.FixedLenFeature([seq_length], tf.int64),
+        "label_ids_ctype": tf.FixedLenFeature([seq_length], tf.int64),
+        "label_ids_relation": tf.FixedLenFeature([seq_length], tf.int64),
+        "label_ids_rtype": tf.FixedLenFeature([seq_length], tf.int64),
     }
     def _decode_record(record, name_to_features):
         example = tf.parse_single_example(record, name_to_features)
@@ -449,22 +499,36 @@ def create_model(bert_config, is_training, input_ids, mask,
         )
 
     output_layer = model.get_sequence_output()
-    #output_layer shape is
-    if is_training:
-        output_layer = tf.keras.layers.Dropout(rate=0.1)(output_layer)
-    logits = hidden2tag(output_layer,num_labels)
-    # TODO test shape
-    logits = tf.reshape(logits,[-1,FLAGS.max_seq_length,num_labels])
-    if FLAGS.crf:
-        mask2len = tf.reduce_sum(mask,axis=1)
-        loss, trans = crf_loss(logits,labels,mask,num_labels,mask2len)
-        predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
-        return (loss, logits,predict)
+    all_losses = []
+    all_logits = {}
+    all_predict = {}
 
-    else:
-        loss,predict  = softmax_layer(logits, labels, num_labels, mask)
+    for s in ['component', 'ctype', 'relation', 'rtype']:
+        #output_layer shape is
+        if is_training:
+            output_layer = tf.keras.layers.Dropout(rate=0.1)(output_layer)
+        logits = hidden2tag(output_layer,num_labels)
+        # TODO test shape
+        logits = tf.reshape(logits,[-1,FLAGS.max_seq_length,num_labels])
+        all_logits[s] = logits
+        if FLAGS.crf:
+            mask2len = tf.reduce_sum(mask,axis=1)
+            loss, trans = crf_loss(logits,labels,mask,num_labels,mask2len)
+            predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
 
-        return (loss, logits, predict)
+            all_losses.append(loss)
+            all_predict[s] = predict
+
+            #return (loss, logits,predict)
+
+        else:
+            loss,predict  = softmax_layer(logits, labels, num_labels, mask)
+            all_losses.append(loss)
+            all_predict[s] = predict
+
+    loss = tf.reduce_sum(all_losses)
+
+    return (loss, all_logits, all_predict)
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
@@ -521,6 +585,8 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
         elif mode == tf.estimator.ModeKeys.EVAL:
             def metric_fn(label_ids, logits,num_labels,mask):
+
+                #change predictions
                 predictions = tf.math.argmax(logits, axis=-1, output_type=tf.int32)
                 cm = metrics.streaming_confusion_matrix(label_ids, predictions, num_labels-1, weights=mask)
                 return {
