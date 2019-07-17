@@ -20,6 +20,7 @@ from bert import tokenization
 import tensorflow as tf
 import metrics
 import numpy as np
+from file_converter import FileConverter
 FLAGS = flags.FLAGS
 
 ## Required parameters
@@ -125,7 +126,7 @@ flags.DEFINE_string("crf", "True", "use crf!")
 class InputExample(object):
   """A single training/test example for simple sequence classification."""
 
-  def __init__(self, guid, text, label=None):
+  def __init__(self, guid, text, b=None, t=None, d=None, s=None):
     """Constructs a InputExample.
 
     Args:
@@ -137,7 +138,10 @@ class InputExample(object):
     """
     self.guid = guid
     self.text = text
-    self.label = label
+    self.b = b
+    self.t = t
+    self.d = d
+    self.s = s
 
 class PaddingInputExample(object):
   """Fake example so the num input examples is a multiple of the batch size.
@@ -203,19 +207,21 @@ class DataProcessor(object):
 
 class NerProcessor(DataProcessor):
     def get_train_examples(self, data_dir):
-        return self._create_example(
-            self._read_data(os.path.join(data_dir, "train.txt")), "train"
-        )
+        start_id = 1
+        end_id = 300
+
+        return self._create_example(data_dir, start_id, end_id, "train")
 
     def get_dev_examples(self, data_dir):
-        return self._create_example(
-            self._read_data(os.path.join(data_dir, "dev.txt")), "dev"
-        )
+        start_id = 301
+        end_id = 350
+
+        return self._create_example(data_dir, start_id, end_id, "dev")
 
     def get_test_examples(self,data_dir):
-        return self._create_example(
-            self._read_data(os.path.join(data_dir, "test.txt")), "test"
-        )
+        start_id = 351
+        end_id = 402
+        return self._create_example(data_dir, start_id, end_id, "test")
 
 
     def get_labels(self):
@@ -224,15 +230,28 @@ class NerProcessor(DataProcessor):
         "[PAD]" for padding
         :return:
         """
-        return ["[PAD]","B-MISC", "I-MISC", "O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X","[CLS]","[SEP]"]
+        # return ["[PAD]","B-MISC", "I-MISC", "O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X","[CLS]","[SEP]"]
+        return {'b': ["O", "B", "I", "_"], 't': ["C", "P", "MC", "_"], 'd': [str(s) for s in range(-11, 11)]+["_"], 's': ["Supp", "Att", "For", "Ag", "_"]}
 
-    def _create_example(self, lines, set_type):
+    def _create_example(self, data_dir, start_id, end_id, set_type):
+        fc = FileConverter()
         examples = []
-        for (i, line) in enumerate(lines):
-            guid = "%s-%s" % (set_type, i)
-            texts = tokenization.convert_to_unicode(line[1])
-            labels = tokenization.convert_to_unicode(line[0])
-            examples.append(InputExample(guid=guid, text=texts, label=labels))
+        for i in range(start_id, end_id + 1):
+            filename = '{}essay{:03d}'.format(data_dir, i)
+            parsed_file = fc.parse_file(filename)
+            for j, text_token in enumerate(parsed_file):
+                guid = "%s-%s-%s" % (set_type, i, j)
+                texts = tokenization.convert_to_unicode(text_token['text'])
+                b = tokenization.convert_to_unicode(text_token['b'])
+                t = tokenization.convert_to_unicode(text_token['t'])
+                d = tokenization.convert_to_unicode(text_token['d'])
+                s = tokenization.convert_to_unicode(text_token['s'])
+                examples.append(InputExample(guid=guid, text=texts, b=b, t=t, d=d, s=s))
+        # for (i, line) in enumerate(lines):
+        #     guid = "%s-%s" % (set_type, i)
+        #     texts = tokenization.convert_to_unicode(line[1])
+        #     labels = tokenization.convert_to_unicode(line[0])
+        #     examples.append(InputExample(guid=guid, text=texts, b=labels))
         return examples
 
 
@@ -395,10 +414,10 @@ def crf_loss(logits,labels,mask,num_labels,mask2len):
                 shape=[num_labels,num_labels],
                 initializer=tf.contrib.layers.xavier_initializer()
         )
-    
+
     log_likelihood,transition = tf.contrib.crf.crf_log_likelihood(logits,labels,transition_params =trans ,sequence_lengths=mask2len)
     loss = tf.math.reduce_mean(-log_likelihood)
-   
+
     return loss,transition
 
 def softmax_layer(logits,labels,num_labels,mask):
@@ -461,12 +480,12 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         if FLAGS.crf:
             (total_loss, logits,predicts) = create_model(bert_config, is_training, input_ids,
-                                                            mask, segment_ids, label_ids,num_labels, 
+                                                            mask, segment_ids, label_ids,num_labels,
                                                             use_one_hot_embeddings)
 
         else:
             (total_loss, logits, predicts) = create_model(bert_config, is_training, input_ids,
-                                                            mask, segment_ids, label_ids,num_labels, 
+                                                            mask, segment_ids, label_ids,num_labels,
                                                             use_one_hot_embeddings)
         tvars = tf.trainable_variables()
         scaffold_fn = None
@@ -490,7 +509,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                             init_string)
 
-        
+
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             train_op = optimization.create_optimizer(total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
@@ -543,11 +562,11 @@ def Writer(output_predict_file,result,batch_tokens,batch_labels,id2label):
                 predictions.extend(pred)
             for i,prediction in enumerate(predictions):
                 _write_base(batch_tokens,id2label,prediction,batch_labels,wf,i)
-                
+
         else:
             for i,prediction in enumerate(result):
                 _write_base(batch_tokens,id2label,prediction,batch_labels,wf,i)
-            
+
 
 
 def main(_):
@@ -660,7 +679,7 @@ def main(_):
         with open(FLAGS.middle_output+'/label2id.pkl', 'rb') as rf:
             label2id = pickle.load(rf)
             id2label = {value: key for key, value in label2id.items()}
-   
+
         predict_examples = processor.get_test_examples(FLAGS.data_dir)
 
         predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
