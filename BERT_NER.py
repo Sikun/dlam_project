@@ -274,35 +274,28 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
 
     label_map_component = {}
     #here start with zero this means that "[PAD]" is zero
-    for (i,label) in enumerate(label_list['component']):
+    for (i,label) in enumerate(label_list['b']):
         label_map_component[label] = i
 
     label_map_ctype = {}
     #here start with zero this means that "[PAD]" is zero
-    for (i,label) in enumerate(label_list['ctype']):
+    for (i,label) in enumerate(label_list['t']):
         label_map_ctype[label] = i
 
     label_map_relation = {}
     #here start with zero this means that "[PAD]" is zero
-    for (i,label) in enumerate(label_list['relation']):
+    for (i,label) in enumerate(label_list['d']):
         label_map_relation[label] = i
 
     label_map_rtype = {}
     #here start with zero this means that "[PAD]" is zero
-    for (i,label) in enumerate(label_list['rtype']):
+    for (i,label) in enumerate(label_list['s']):
         label_map_rtype[label] = i
 
 
 
     with open(FLAGS.middle_output+"/label2id.pkl",'wb') as w:
         pickle.dump(label_map,w)
-    textlist = example.text.split(' ')
-    labellist = {}
-
-    labellist['component'] = example.component.split(' ')
-    labellist['ctype'] = example.ctype.split(' ')
-    labellist['relation'] = example.relation.split(' ')
-    labellist['rtype'] = example.rtype.split(' ')
 
     tokens = []
 
@@ -311,15 +304,15 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     labels_relation = []
     labels_rtype = []
 
-    for i,(word,component, ctype, relation, rtype) in enumerate(zip(textlist, labellist{'component'}, labellist{'ctype'}, labellist{'relation'}, labellist{'rtype'})):
-        token = tokenizer.tokenize(word)
+    for word in data:
+        token = tokenizer.tokenize(word['text'])
         tokens.extend(token)
         for i,_ in enumerate(token):
             if i==0:
-                labels_component.append(component)
-                labels_ctype.append(ctype)
-                labels_relation.append(relation)
-                labels_rtype.append(rtype)
+                labels_component.append(word['b'])
+                labels_ctype.append(word['t'])
+                labels_relation.append(word['d'])
+                labels_rtype.append(word['s'])
             else:
                 labels_component.append("X")
                 labels_ctype.append("X")
